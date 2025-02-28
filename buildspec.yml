@@ -1,16 +1,22 @@
 version: 0.2
 phases:
-  pre_build:
+  install:
+    runtime-versions:
+      python: 3.11
     commands:
-      - echo "Starting build process..."
+      - echo "Installing dependencies..."
+      - pip install -r requirements.txt -t lib
   build:
     commands:
-      - echo "Copying DAG files to S3..."
-      - aws s3 cp --recursive ./dags s3://airflow-managed-gds/dags/
-      - echo "Copying requirements.txt files to S3..."
-      - aws s3 cp ./requirements.txt s3://airflow-managed-gds/
-      - echo "Copying Glue scripts to S3..."
-      - aws s3 cp --recursive ./scripts s3://aws-glue-assets-851725469799-us-east-1/scripts/
+      - echo "Zipping deployment package..."
+      - cd lib
+      - zip -r9 ../deployment_package.zip .
+      - cd ..
+      - zip -g deployment_package.zip lambda_function.py
   post_build:
     commands:
-      - echo "Build and deployment process complete!!!"
+      - echo "Uploading to S3..."
+      - aws s3 cp deployment_package.zip s3://lambda-builds-zip/
+      - echo "Updating Lambda function via S3..."
+      - aws lambda update-function-code --function-name tesmp-cicd --s3-bucket lambda-builds-zip --s3-key deployment_package.zip
+      - echo "Deployment complete!"
